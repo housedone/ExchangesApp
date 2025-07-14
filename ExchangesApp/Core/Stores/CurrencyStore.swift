@@ -18,6 +18,34 @@ final class CurrencyStore {
     }
     self.context = appDelegate.persistentContainer.viewContext
   }
+  
+  func fetchCurrencyTrends() throws -> [String: RateTrend] {
+    let currencies = try fetchAllStoredCurrencies()
+    return Dictionary(uniqueKeysWithValues: currencies.compactMap {
+      guard let code = $0.code, let trendString = $0.trend else { return nil }
+      let trend: RateTrend? = {
+        switch trendString {
+        case "up": return .up
+        case "down": return .down
+        case "same": return .same
+        default: return nil
+        }
+      }()
+      guard let validTrend = trend else { return nil }
+      return (code, validTrend)
+    })
+  }
+
+  func fetchLastUpdatedUnix() throws -> Int? {
+    let request: NSFetchRequest<StoredCurrency> = StoredCurrency.fetchRequest()
+    request.fetchLimit = 1
+    request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
+
+    guard let latest = try context.fetch(request).first,
+          let updatedAt = latest.updatedAt else { return nil }
+
+    return Int(updatedAt.timeIntervalSince1970)
+  }
 
   /// 환율 데이터를 요청해 가져와 국가코드-환율을 딕셔너리로 반환하는 함수.
   func fetchRatesDictionary() throws -> [String: Double] {
@@ -42,6 +70,13 @@ final class CurrencyStore {
       entity.name = item.name
       entity.rate = item.rate
       entity.updatedAt = Date()
+      entity.trend = item.trend.map { trend in
+        switch trend {
+        case .up: return "up"
+        case .down: return "down"
+        case .same: return "same"
+        }
+      }
     }
 
     try context.save()

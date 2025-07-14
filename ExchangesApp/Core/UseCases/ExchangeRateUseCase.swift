@@ -34,25 +34,44 @@ final class ExchangeRateUseCase {
       
       switch result {
       case .success(let sortedRates):
-        do {
-          var previousRates = try self.currencyStore.fetchRatesDictionary()
-          let items = sortedRates.map { code, rate -> CurrencyItem in
-            let name = self.currencyNameService.currencyNames[code] ?? "알 수 없음"
+        self.exchangeRateService.fetchExchangeRateDetails { result in
+          switch result {
+          case .success(let rateData):
+            do {
+              let previousRates = try self.currencyStore.fetchRatesDictionary()
+              let previousTrends = try self.currencyStore.fetchCurrencyTrends()
+              let lastUpdatedUnix = try self.currencyStore.fetchLastUpdatedUnix()
+
+              let shouldUpdateTrends = lastUpdatedUnix != rateData.timeLastUpdateUnix
+
+              let items = sortedRates.map { code, rate -> CurrencyItem in
+                let name = self.currencyNameService.currencyNames[code] ?? "알 수 없음"
+                let trend: RateTrend?
+                
+                if shouldUpdateTrends {
+                  trend = self.trend(from: previousRates[code], to: rate)
+                } else {
+                  trend = previousTrends[code] // 🔁 trend 유지
+                }
+
+                return CurrencyItem(code: code, name: name, rate: rate, isFavorite: false, trend: trend)
+              }
+
+              if shouldUpdateTrends {
+                try self.currencyStore.saveAllCurrencies(items)
+              }
+
+              completion(.success(items))
+            } catch {
+              completion(.failure(.networkFailed(error)))
+            }
             
-            // !환율 변동 테스트를 위한 코드로, 테스트 중이 아닌 경우 주석처리하시오!
-            previousRates[code] = previousRates[code]! * Double.random(in: 0.95...1.05)
-            
-            let trend = self.trend(from: previousRates[code], to: rate)
-            return CurrencyItem(code: code, name: name, rate: rate, isFavorite: false, trend: trend)
+          case .failure(let error):
+            completion(.failure(.networkFailed(error)))
           }
-          try self.currencyStore.saveAllCurrencies(items)
-          completion(.success(items))
-        } catch {
-          completion(.failure(.networkFailed(error)))
         }
-        
-      case .failure(let afError):
-        completion(.failure(.networkFailed(afError)))
+      case .failure(let error):
+        completion(.failure(.networkFailed(error)))
       }
     }
   }

@@ -30,4 +30,15 @@ class ExchangeRateService {
       }
     }
   }
+  
+  func fetchExchangeRateDetails(completion: @escaping (Result<ExchangeRate, AFError>) -> Void) {
+    guard let url = URL(string: baseURLString) else {
+      completion(.failure(AFError.invalidURL(url: "잘못된 URL")))
+      return
+    }
+
+    AF.request(url).responseDecodable(of: ExchangeRate.self) { response in
+      completion(response.result)
+    }
+  }
 }

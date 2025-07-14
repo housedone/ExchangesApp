@@ -34,7 +34,7 @@ final class ExchangeRateViewController: UIViewController {
     exchangeRateView.searchBar.delegate = self
   }
   
-  /// 뷰모델에서 상태가 변경될 때 뷰릉 갱신하도록 바인딩
+  /// 뷰모델에서 상태가 변경될 때 뷰를 갱신하도록 바인딩
   private func bindViewModel() {
     viewModel.onStateChanged = { [weak self] state in
       guard let self else { return }
